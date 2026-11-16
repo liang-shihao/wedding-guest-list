@@ -85,7 +85,7 @@ class PublicTest(ServerCase):
         self.cookie = None
         for path in ("/api/search?q=" + "%E5%BC%A0%E4%B8%89",  # 张三
                      "/api/search?q=" + "%E4%B8%89%E4%B8%B0",  # 三丰
-                     f"/api/seat/{gid}"):
+                     f"/api/seat/{gid}?q=%E5%BC%A0%E4%B8%89"):
             resp, payload = self.req("GET", path, raw=True)
             self.assertEqual(resp.status, 200)
             self.assertNotIn("素食", payload.decode("utf-8"))
@@ -101,21 +101,42 @@ class PublicTest(ServerCase):
         resp, _ = self.req("GET", "/api/search")
         self.assertEqual(resp.status, 400)
 
+    def test_seat_enumeration_blocked(self):
+        self.login()
+        gid = self.add("张三丰", "3")
+        self.cookie = None
+        resp, _ = self.req("GET", f"/api/seat/{gid}")
+        self.assertEqual(resp.status, 404)
+        resp, _ = self.req("GET", f"/api/seat/{gid}?q=%E6%9D%8E%E5%9B%9B")  # 李四
+        self.assertEqual(resp.status, 404)
+        resp, body = self.req("GET", f"/api/seat/{gid}?q=%E4%B8%89%E4%B8%B0")  # 三丰
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["table"], "3")
+
     def test_seat_404(self):
-        resp, _ = self.req("GET", "/api/seat/999")
+        resp, _ = self.req("GET", "/api/seat/999?q=%E4%B8%89%E4%B8%B0")
         self.assertEqual(resp.status, 404)
         resp, _ = self.req("GET", "/api/seat/abc")
         self.assertEqual(resp.status, 404)
 
     def test_settings_public(self):
         resp, body = self.req("GET", "/api/settings")
-        self.assertEqual(body, {"title": "", "date_text": "", "welcome": "", "has_floorplan": False})
+        self.assertEqual(body, {"title": "", "date_text": "", "welcome": "", "has_floorplan": False,
+                                "floorplan_version": ""})
 
     def test_nosniff_and_no_store_headers(self):
         resp, _ = self.req("GET", "/api/settings")
         self.assertEqual(resp.getheader("X-Content-Type-Options"), "nosniff")
         resp, _ = self.req("GET", "/api/admin/guests")
         self.assertEqual(resp.getheader("Cache-Control"), "no-store")
+
+    def test_handler_has_socket_timeout(self):
+        from seat.server import Handler
+        self.assertTrue(Handler.timeout and Handler.timeout <= 30)
+
+    def test_login_body_capped(self):
+        resp, _ = self.req("POST", "/api/admin/login", b"x" * 5000, headers={"Content-Type": "application/json"})
+        self.assertEqual(resp.status, 413)
 
     def test_body_too_large_413(self):
         resp, _ = self.req("POST", "/api/admin/login", b"x", headers={"Content-Length": str(7 * 1024 * 1024)})
@@ -239,9 +260,15 @@ class AdminTest(ServerCase):
         self.assertEqual(payload, PNG)
         resp, body = self.req("GET", "/api/settings")
         self.assertTrue(body["has_floorplan"])
+        v1 = body["floorplan_version"]
+        self.assertTrue(v1)
+        resp, _ = self.req("GET", "/floorplan?v=" + v1, raw=True)
+        self.assertIn("max-age=86400", resp.getheader("Cache-Control"))
         self.login()
         resp, _ = self.req("POST", "/api/admin/floorplan", b"jpgdata", headers={"Content-Type": "image/jpeg"})
         self.assertEqual(resp.status, 200)
+        resp, body = self.req("GET", "/api/settings")
+        self.assertNotEqual(body["floorplan_version"], v1)
         resp, _ = self.req("DELETE", "/api/admin/floorplan")
         self.assertEqual(resp.status, 200)
         resp, _ = self.req("GET", "/floorplan", raw=True)

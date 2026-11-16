@@ -57,8 +57,14 @@ class StoreTest(unittest.TestCase):
             self.s.search("  ")
 
     def test_seat(self):
-        self.assertEqual(self.s.seat(self.ls), {"name": "李四", "table": "主桌", "public_note": ""})
-        self.assertIsNone(self.s.seat(9999))
+        self.assertEqual(self.s.seat(self.zf, "三丰"), {"name": "张三丰", "table": "3", "public_note": ""})
+        self.assertIsNone(self.s.seat(9999, "三丰"))
+
+    def test_seat_requires_matching_query(self):
+        self.assertIsNone(self.s.seat(self.zf, ""))
+        self.assertIsNone(self.s.seat(self.zf, "丰"))
+        self.assertIsNone(self.s.seat(self.zf, "李四"))
+        self.assertIsNone(self.s.seat(self.zf, "%%"))
 
     def test_add_requires_name_and_table(self):
         with self.assertRaises(ValueError):
@@ -108,6 +114,14 @@ class StoreTest(unittest.TestCase):
         self.assertIn(b, dups)
         self.assertNotIn(self.z1, dups)
         self.assertNotIn(self.zf, dups)
+
+    def test_rekeys_stale_name_keys_on_open(self):
+        import sqlite3
+        c = sqlite3.connect(os.path.join(self.tmp.name, "guests.db"))
+        c.execute("UPDATE guests SET name_key = 'stale' WHERE id = ?", (self.ls,))
+        c.commit(); c.close()
+        s2 = Store(self.tmp.name)
+        self.assertEqual(s2.search("李四")["mode"], "exact")
 
     def test_settings_roundtrip(self):
         self.assertEqual(self.s.get_settings(), {"title": "", "date_text": "", "welcome": "", "floorplan": ""})

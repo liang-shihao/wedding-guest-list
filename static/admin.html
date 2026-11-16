@@ -422,7 +422,7 @@
     api("GET", "/api/settings").then(function (s) {
       $("s_title").value = s.title; $("s_date").value = s.date_text; $("s_welcome").value = s.welcome;
       $("planImg").hidden = !s.has_floorplan; $("planDel").hidden = !s.has_floorplan; $("planNone").hidden = s.has_floorplan;
-      if (s.has_floorplan) $("planImg").src = "/floorplan?t=" + Date.now();
+      if (s.has_floorplan) $("planImg").src = "/floorplan?v=" + encodeURIComponent(s.floorplan_version);
     }, fail);
   }
   $("settingsForm").addEventListener("submit", function (ev) {

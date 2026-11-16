@@ -52,6 +52,11 @@ class Store:
         with self._conn() as c:
             c.execute("PRAGMA journal_mode=WAL")
             c.executescript(_SCHEMA)
+            # Recompute match keys in case normalize_name changed between versions.
+            for r in c.execute("SELECT id, name, name_key FROM guests").fetchall():
+                key = normalize_name(r["name"])
+                if key != r["name_key"]:
+                    c.execute("UPDATE guests SET name_key = ? WHERE id = ?", (key, r["id"]))
 
     @contextmanager
     def _conn(self):
@@ -94,9 +99,17 @@ class Store:
             "results": [{"id": r["id"], "name": r["name"], "public_note": r["public_note"]} for r in rows],
         }
 
-    def seat(self, guest_id: int):
+    def seat(self, guest_id: int, q: str):
+        """Seat for a fuzzy candidate. Requires the same query that produced it,
+        so ids cannot be enumerated to dump the list."""
+        key = normalize_name(q)
+        if len(key) < 2:
+            return None
         with self._conn() as c:
-            r = c.execute("SELECT name, table_no, public_note FROM guests WHERE id = ?", (guest_id,)).fetchone()
+            r = c.execute(
+                "SELECT name, table_no, public_note FROM guests WHERE id = ? AND name_key LIKE ? ESCAPE '\\'",
+                (guest_id, "%" + _escape_like(key) + "%"),
+            ).fetchone()
         if r is None:
             return None
         return {"name": r["name"], "table": r["table_no"], "public_note": r["public_note"]}
@@ -147,8 +160,9 @@ class Store:
         return True
 
     def delete_guest(self, guest_id: int) -> bool:
-        if self.seat(guest_id) is None:
-            return False
+        with self._conn() as c:
+            if c.execute("SELECT 1 FROM guests WHERE id = ?", (guest_id,)).fetchone() is None:
+                return False
         self.backup()
         with self._conn() as c:
             return c.execute("DELETE FROM guests WHERE id = ?", (guest_id,)).rowcount > 0

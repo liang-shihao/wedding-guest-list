@@ -112,7 +112,7 @@
 
   <section id="plan" hidden>
     <h2>宴会厅平面图</h2>
-    <a href="/floorplan" target="_blank"><img src="" alt="宴会厅平面图" id="planimg"></a>
+    <a href="/floorplan" id="planlink" target="_blank"><img alt="宴会厅平面图" id="planimg"></a>
     <div class="tip">点击图片可放大查看</div>
   </section>
 
@@ -165,8 +165,18 @@
     return box;
   }
 
+  var planSrc = "";
+  function showPlan() {
+    // Load the floor plan only once a guest has found a seat, to save bandwidth.
+    if (!planSrc) return;
+    var img = document.getElementById("planimg");
+    if (!img.getAttribute("src")) { img.src = planSrc; document.getElementById("planlink").href = planSrc; }
+    document.getElementById("plan").hidden = false;
+  }
+
   function showSeats(list) {
     clear();
+    showPlan();
     var multi = list.length > 1;
     if (multi) result.appendChild(el("div", "pick-title", "有 " + list.length + " 位同名宾客，请根据说明找到自己："));
     list.forEach(function (s) { result.appendChild(seatBlock(s, multi || !!s.public_note)); });
@@ -187,7 +197,7 @@
       b.appendChild(left);
       b.addEventListener("click", function () {
         message("查询中…");
-        getJSON("/api/seat/" + encodeURIComponent(c.id)).then(function (s) {
+        getJSON("/api/seat/" + encodeURIComponent(c.id) + "?q=" + encodeURIComponent(query)).then(function (s) {
           showSeats([s]);
           var back = el("button", "back", "返回候选列表");
           back.type = "button";
@@ -217,10 +227,7 @@
     if (s.title) { document.getElementById("title").textContent = s.title; document.title = s.title + " · 座位查询"; }
     if (s.date_text) document.getElementById("date").textContent = s.date_text;
     if (s.welcome) { var w = document.getElementById("welcome"); w.textContent = s.welcome; w.hidden = false; }
-    if (s.has_floorplan) {
-      document.getElementById("planimg").src = "/floorplan?t=" + Date.now();
-      document.getElementById("plan").hidden = false;
-    }
+    if (s.has_floorplan) planSrc = "/floorplan?v=" + encodeURIComponent(s.floorplan_version);
   }, function () {});
 })();
 </script>

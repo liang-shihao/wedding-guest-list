@@ -18,6 +18,7 @@ log = logging.getLogger("seat")
 
 MAX_BODY = 6 * 1024 * 1024
 MAX_IMAGE = 5 * 1024 * 1024
+LOGIN_MAX_BODY = 4096
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 EXT_TYPES = {ext: ctype for ctype, ext in IMAGE_TYPES.items()}
 COOKIE = "admin"
@@ -46,6 +47,7 @@ class Context:
 class Handler(BaseHTTPRequestHandler):
     server_version = "seat"
     sys_version = ""
+    timeout = 20  # seconds; stops idle/slow clients pinning threads
 
     # ---- plumbing --------------------------------------------------------
     @property
@@ -86,18 +88,18 @@ class Handler(BaseHTTPRequestHandler):
     def _ip(self):
         return client_ip(self.client_address[0], self.headers, self.ctx.trust_proxy)
 
-    def _raw_body(self) -> bytes:
+    def _raw_body(self, limit=MAX_BODY) -> bytes:
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             raise HttpError(400, "请求格式错误")
-        if length > MAX_BODY:
+        if length > limit:
             self.close_connection = True
             raise HttpError(413, "内容太大")
         return self.rfile.read(length) if length > 0 else b""
 
-    def _json_body(self) -> dict:
-        raw = self._raw_body()
+    def _json_body(self, limit=MAX_BODY) -> dict:
+        raw = self._raw_body(limit)
         if not raw:
             return {}
         try:
@@ -152,7 +154,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(self.ctx.store.search(q))
             m = re.fullmatch(r"/api/seat/(\d+)", path)
             if method == "GET" and m:
-                seat = self.ctx.store.seat(int(m.group(1)))
+                q = parse_qs(url.query).get("q", [""])[0]
+                seat = self.ctx.store.seat(int(m.group(1)), q)
                 if seat is None:
                     raise HttpError(404, "没有找到")
                 return self._json(seat)
@@ -160,7 +163,9 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and path == "/api/settings":
             s = self.ctx.store.get_settings()
             out = {k: s[k] for k in PUBLIC_SETTINGS}
-            out["has_floorplan"] = self._floorplan_path() is not None
+            fp = self._floorplan_path()
+            out["has_floorplan"] = fp is not None
+            out["floorplan_version"] = str(os.stat(fp[0]).st_mtime_ns) if fp else ""
             return self._json(out)
         if method == "GET" and path == "/floorplan":
             return self._floorplan()
@@ -187,7 +192,8 @@ class Handler(BaseHTTPRequestHandler):
             raise HttpError(404, "没有平面图")
         with open(fp[0], "rb") as f:
             body = f.read()
-        self._send(200, body, fp[1], {"Cache-Control": "no-cache"})
+        # URL carries ?v=<mtime>, so a new upload gets a new URL; let phones cache it.
+        self._send(200, body, fp[1], {"Cache-Control": "public, max-age=86400"})
 
     # ---- admin -----------------------------------------------------------
     def _admin(self, method, sub):
@@ -251,7 +257,7 @@ class Handler(BaseHTTPRequestHandler):
         now = time.time()
         if self.ctx.guard.is_locked(ip, now):
             raise HttpError(429, "密码错误次数太多，请 10 分钟后再试")
-        given = str(self._json_body().get("password") or "")
+        given = str(self._json_body(LOGIN_MAX_BODY).get("password") or "")
         if not hmac.compare_digest(given.encode("utf-8"), self.ctx.password.encode("utf-8")):
             self.ctx.guard.fail(ip, now)
             raise HttpError(401, "密码错误")
