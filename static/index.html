@@ -1,1 +1,228 @@
-<!doctype html><meta charset="utf-8"><title>座位查询</title>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>座位查询</title>
+<style>
+  :root {
+    --bg: #fbf6f1;
+    --card: #ffffff;
+    --ink: #3a2a26;
+    --muted: #8a7670;
+    --accent: #b8323a;
+    --accent-soft: #f6e4e2;
+    --line: #ecdcd6;
+    --gold: #b88a4a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 40px 16px 48px; }
+  header { text-align: center; margin-bottom: 28px; }
+  .ornament { color: var(--accent); font-size: 30px; line-height: 1; }
+  h1 { font-size: 26px; font-weight: 600; margin: 10px 0 6px; letter-spacing: .04em; }
+  .date { color: var(--gold); font-size: 15px; letter-spacing: .12em; }
+  .welcome { color: var(--muted); margin: 10px 0 0; white-space: pre-line; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 6px 24px rgba(120, 60, 50, .06);
+  }
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+  .row { display: flex; gap: 10px; }
+  input {
+    flex: 1; min-width: 0;
+    font: inherit; font-size: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: #fff; color: var(--ink);
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  button {
+    font: inherit; cursor: pointer;
+    border: 0; border-radius: 10px;
+  }
+  .primary { background: var(--accent); color: #fff; padding: 0 20px; font-size: 17px; font-weight: 600; }
+  .primary:disabled { opacity: .6; }
+  #result { margin-top: 18px; }
+  #result:empty { display: none; }
+  .msg { color: var(--muted); text-align: center; padding: 8px 0; }
+  .msg.error { color: var(--accent); }
+  .seat { text-align: center; padding: 8px 0 4px; }
+  .seat + .seat { border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 16px; }
+  .seat .hello { font-size: 17px; }
+  .seat .note { color: var(--muted); font-size: 14px; }
+  .seat .table {
+    display: inline-block; margin-top: 10px;
+    font-size: 40px; font-weight: 700; color: var(--accent);
+    padding: 6px 28px; border: 2px solid var(--accent); border-radius: 14px;
+    background: var(--accent-soft);
+    letter-spacing: .04em;
+  }
+  .pick-title { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+  .pick {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    width: 100%; text-align: left;
+    background: #fff; border: 1px solid var(--line);
+    padding: 12px 14px; margin-top: 8px; color: var(--ink);
+  }
+  .pick .note { color: var(--muted); font-size: 14px; }
+  .pick::after { content: "›"; color: var(--muted); font-size: 22px; line-height: 1; }
+  .back { background: none; color: var(--muted); font-size: 14px; padding: 8px 0 0; text-decoration: underline; }
+  #plan { margin-top: 20px; }
+  #plan[hidden] { display: none; }
+  #plan h2 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 10px; text-align: center; }
+  #plan img { display: block; width: 100%; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
+  #plan .tip { text-align: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="ornament">囍</div>
+    <h1 id="title">欢迎参加我们的婚礼</h1>
+    <div class="date" id="date"></div>
+    <p class="welcome" id="welcome" hidden></p>
+  </header>
+
+  <section class="card">
+    <form id="form" autocomplete="off">
+      <label for="q">请输入您的姓名，查询座位</label>
+      <div class="row">
+        <input id="q" name="q" type="search" enterkeyhint="search" placeholder="例如：张三" maxlength="40">
+        <button class="primary" id="go" type="submit">查询</button>
+      </div>
+    </form>
+    <div id="result" aria-live="polite"></div>
+  </section>
+
+  <section id="plan" hidden>
+    <h2>宴会厅平面图</h2>
+    <a href="/floorplan" target="_blank"><img src="" alt="宴会厅平面图" id="planimg"></a>
+    <div class="tip">点击图片可放大查看</div>
+  </section>
+
+  <footer>如有疑问，请咨询现场工作人员</footer>
+</main>
+
+<script>
+(function () {
+  var NOT_FOUND = "没有找到，请检查姓名；随行家属请输入邀请人的姓名，或咨询现场工作人员";
+  var form = document.getElementById("form");
+  var input = document.getElementById("q");
+  var go = document.getElementById("go");
+  var result = document.getElementById("result");
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function formatTable(t) {
+    t = String(t == null ? "" : t).trim();
+    return /^[0-9]+$/.test(t) ? "第 " + t + " 桌" : t;
+  }
+  function clear() { while (result.firstChild) result.removeChild(result.firstChild); }
+  function message(text, isError) { clear(); result.appendChild(el("div", "msg" + (isError ? " error" : ""), text)); }
+
+  function getJSON(url) {
+    return fetch(url, { headers: { "Accept": "application/json" } }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) {
+          var err = new Error(body.error || "查询失败");
+          err.status = r.status;
+          throw err;
+        }
+        return body;
+      });
+    });
+  }
+  function fail(e) {
+    if (e && e.status) message(e.message, true);
+    else message("网络不太好，请稍后重试", true);
+  }
+
+  function seatBlock(s, showName) {
+    var box = el("div", "seat");
+    box.appendChild(el("div", "hello", (s.name || "") + " 您好，您的座位在"));
+    if (showName && s.public_note) box.appendChild(el("div", "note", s.public_note));
+    box.appendChild(el("div", "table", formatTable(s.table)));
+    return box;
+  }
+
+  function showSeats(list) {
+    clear();
+    var multi = list.length > 1;
+    if (multi) result.appendChild(el("div", "pick-title", "有 " + list.length + " 位同名宾客，请根据说明找到自己："));
+    list.forEach(function (s) { result.appendChild(seatBlock(s, multi || !!s.public_note)); });
+  }
+
+  function showPicks(list, query) {
+    clear();
+    result.appendChild(el("div", "pick-title", "没有找到「" + query + "」，您是不是要找："));
+    list.forEach(function (c) {
+      var b = el("button", "pick");
+      b.type = "button";
+      var left = el("span");
+      left.appendChild(el("span", null, c.name));
+      if (c.public_note) {
+        left.appendChild(document.createTextNode("  "));
+        left.appendChild(el("span", "note", c.public_note));
+      }
+      b.appendChild(left);
+      b.addEventListener("click", function () {
+        message("查询中…");
+        getJSON("/api/seat/" + encodeURIComponent(c.id)).then(function (s) {
+          showSeats([s]);
+          var back = el("button", "back", "返回候选列表");
+          back.type = "button";
+          back.addEventListener("click", function () { showPicks(list, query); });
+          result.appendChild(back);
+        }, fail);
+      });
+      result.appendChild(b);
+    });
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var q = input.value.trim();
+    if (!q) { message("请输入姓名", true); input.focus(); return; }
+    input.blur();
+    go.disabled = true;
+    message("查询中…");
+    getJSON("/api/search?q=" + encodeURIComponent(q)).then(function (r) {
+      if (r.mode === "exact" && r.results.length) showSeats(r.results);
+      else if (r.mode === "fuzzy" && r.results.length) showPicks(r.results, q);
+      else message(NOT_FOUND, false);
+    }, fail).then(function () { go.disabled = false; });
+  });
+
+  getJSON("/api/settings").then(function (s) {
+    if (s.title) { document.getElementById("title").textContent = s.title; document.title = s.title + " · 座位查询"; }
+    if (s.date_text) document.getElementById("date").textContent = s.date_text;
+    if (s.welcome) { var w = document.getElementById("welcome"); w.textContent = s.welcome; w.hidden = false; }
+    if (s.has_floorplan) {
+      document.getElementById("planimg").src = "/floorplan?t=" + Date.now();
+      document.getElementById("plan").hidden = false;
+    }
+  }, function () {});
+})();
+</script>
+</body>
+</html>
