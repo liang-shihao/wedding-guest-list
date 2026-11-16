@@ -17,7 +17,8 @@ from .store import Store
 log = logging.getLogger("seat")
 
 MAX_BODY = 6 * 1024 * 1024
-MAX_IMAGE = 5 * 1024 * 1024
+# Uploadable images: slot name -> max bytes. Stored as data/<slot>.<ext>, settings key <slot>.
+IMAGE_SLOTS = {"floorplan": 5 * 1024 * 1024, "background": 1 * 1024 * 1024}
 LOGIN_MAX_BODY = 4096
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 EXT_TYPES = {ext: ctype for ctype, ext in IMAGE_TYPES.items()}
@@ -163,12 +164,13 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and path == "/api/settings":
             s = self.ctx.store.get_settings()
             out = {k: s[k] for k in PUBLIC_SETTINGS}
-            fp = self._floorplan_path()
-            out["has_floorplan"] = fp is not None
-            out["floorplan_version"] = str(os.stat(fp[0]).st_mtime_ns) if fp else ""
+            for slot in IMAGE_SLOTS:
+                fp = self._image_path(slot, s)
+                out[f"has_{slot}"] = fp is not None
+                out[f"{slot}_version"] = str(os.stat(fp[0]).st_mtime_ns) if fp else ""
             return self._json(out)
-        if method == "GET" and path == "/floorplan":
-            return self._floorplan()
+        if method == "GET" and path.lstrip("/") in IMAGE_SLOTS:
+            return self._image(path.lstrip("/"))
         if path.startswith("/api/admin/"):
             return self._admin(method, path[len("/api/admin/"):])
         raise HttpError(404, "没有找到")
@@ -178,18 +180,18 @@ class Handler(BaseHTTPRequestHandler):
             body = f.read()
         self._send(200, body, "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
 
-    def _floorplan_path(self):
-        name = self.ctx.store.get_settings()["floorplan"]
-        ext = name.rsplit(".", 1)[-1] if name.startswith("floorplan.") else ""
+    def _image_path(self, slot, settings=None):
+        name = (settings or self.ctx.store.get_settings())[slot]
+        ext = name.rsplit(".", 1)[-1] if name.startswith(slot + ".") else ""
         if ext not in EXT_TYPES:
             return None
-        p = os.path.join(self.ctx.data_dir, f"floorplan.{ext}")
+        p = os.path.join(self.ctx.data_dir, f"{slot}.{ext}")
         return (p, EXT_TYPES[ext]) if os.path.isfile(p) else None
 
-    def _floorplan(self):
-        fp = self._floorplan_path()
+    def _image(self, slot):
+        fp = self._image_path(slot)
         if fp is None:
-            raise HttpError(404, "没有平面图")
+            raise HttpError(404, "没有图片")
         with open(fp[0], "rb") as f:
             body = f.read()
         # URL carries ?v=<mtime>, so a new upload gets a new URL; let phones cache it.
@@ -244,11 +246,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise HttpError(400, "未知设置")
             store.set_settings(**{k: str(b[k] if b[k] is not None else "") for k in b})
             return self._json({"ok": True})
-        if sub == "floorplan" and method == "POST":
-            return self._upload_floorplan()
-        if sub == "floorplan" and method == "DELETE":
-            self._remove_floorplans()
-            store.set_settings(floorplan="")
+        if sub in IMAGE_SLOTS and method == "POST":
+            return self._upload_image(sub)
+        if sub in IMAGE_SLOTS and method == "DELETE":
+            self._remove_images(sub)
+            store.set_settings(**{sub: ""})
             return self._json({"ok": True})
         raise HttpError(404, "没有找到")
 
@@ -266,29 +268,30 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"ok": True}, headers={
             "Set-Cookie": f"{COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800"})
 
-    def _remove_floorplans(self):
+    def _remove_images(self, slot):
         for ext in EXT_TYPES:
-            p = os.path.join(self.ctx.data_dir, f"floorplan.{ext}")
+            p = os.path.join(self.ctx.data_dir, f"{slot}.{ext}")
             if os.path.exists(p):
                 os.remove(p)
 
-    def _upload_floorplan(self):
+    def _upload_image(self, slot):
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         if ctype not in IMAGE_TYPES:
             raise HttpError(400, "只支持 PNG / JPG / WEBP 图片")
         body = self._raw_body()
-        if len(body) > MAX_IMAGE:
-            raise HttpError(413, "图片不能超过 5MB")
+        limit = IMAGE_SLOTS[slot]
+        if len(body) > limit:
+            raise HttpError(413, f"图片不能超过 {limit // (1024 * 1024)}MB，请先压缩")
         if not body:
             raise HttpError(400, "图片为空")
         ext = IMAGE_TYPES[ctype]
-        self._remove_floorplans()
-        path = os.path.join(self.ctx.data_dir, f"floorplan.{ext}")
+        self._remove_images(slot)
+        path = os.path.join(self.ctx.data_dir, f"{slot}.{ext}")
         tmp = path + ".tmp"
         with open(tmp, "wb") as f:
             f.write(body)
         os.replace(tmp, path)
-        self.ctx.store.set_settings(floorplan=f"floorplan.{ext}")
+        self.ctx.store.set_settings(**{slot: f"{slot}.{ext}"})
         return self._json({"ok": True})
 
 

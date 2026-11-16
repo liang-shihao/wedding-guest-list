@@ -124,7 +124,7 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(s2.search("李四")["mode"], "exact")
 
     def test_settings_roundtrip(self):
-        self.assertEqual(self.s.get_settings(), {"title": "", "date_text": "", "welcome": "", "floorplan": ""})
+        self.assertEqual(self.s.get_settings(), {"title": "", "date_text": "", "welcome": "", "floorplan": "", "background": ""})
         self.s.set_settings(title="A & B 的婚礼", welcome="欢迎")
         st = self.s.get_settings()
         self.assertEqual(st["title"], "A & B 的婚礼")

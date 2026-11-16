@@ -122,7 +122,8 @@ class PublicTest(ServerCase):
     def test_settings_public(self):
         resp, body = self.req("GET", "/api/settings")
         self.assertEqual(body, {"title": "", "date_text": "", "welcome": "", "has_floorplan": False,
-                                "floorplan_version": ""})
+                                "floorplan_version": "", "has_background": False,
+                                "background_version": ""})
 
     def test_nosniff_and_no_store_headers(self):
         resp, _ = self.req("GET", "/api/settings")
@@ -273,6 +274,56 @@ class AdminTest(ServerCase):
         self.assertEqual(resp.status, 200)
         resp, _ = self.req("GET", "/floorplan", raw=True)
         self.assertEqual(resp.status, 404)
+
+
+class BackgroundTest(ServerCase):
+    def test_background_upload_limits_and_serve(self):
+        resp, _ = self.req("POST", "/api/admin/background", PNG, headers={"Content-Type": "image/png"})
+        self.assertEqual(resp.status, 401)
+        self.login()
+        resp, _ = self.req("POST", "/api/admin/background", b"x", headers={"Content-Type": "text/plain"})
+        self.assertEqual(resp.status, 400)
+        big = b"0" * (1024 * 1024 + 1)
+        resp, _ = self.req("POST", "/api/admin/background", big, headers={"Content-Type": "image/jpeg"})
+        self.assertEqual(resp.status, 413)
+        resp, _ = self.req("POST", "/api/admin/background", PNG, headers={"Content-Type": "image/png"})
+        self.assertEqual(resp.status, 200)
+        self.cookie = None
+        resp, body = self.req("GET", "/api/settings")
+        self.assertTrue(body["has_background"])
+        self.assertFalse(body["has_floorplan"])
+        v1 = body["background_version"]
+        self.assertTrue(v1)
+        resp, payload = self.req("GET", "/background?v=" + v1, raw=True)
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(resp.getheader("Content-Type"), "image/png")
+        self.assertIn("max-age=86400", resp.getheader("Cache-Control"))
+        self.assertEqual(payload, PNG)
+        self.login()
+        resp, _ = self.req("POST", "/api/admin/background", b"webp", headers={"Content-Type": "image/webp"})
+        self.assertEqual(resp.status, 200)
+        resp, body = self.req("GET", "/api/settings")
+        self.assertNotEqual(body["background_version"], v1)
+        resp, _ = self.req("DELETE", "/api/admin/background")
+        self.assertEqual(resp.status, 200)
+        resp, _ = self.req("GET", "/background", raw=True)
+        self.assertEqual(resp.status, 404)
+
+    def test_background_and_floorplan_independent(self):
+        self.login()
+        self.req("POST", "/api/admin/floorplan", PNG, headers={"Content-Type": "image/png"})
+        self.req("POST", "/api/admin/background", b"jpg", headers={"Content-Type": "image/jpeg"})
+        self.req("DELETE", "/api/admin/background")
+        resp, body = self.req("GET", "/api/settings")
+        self.assertTrue(body["has_floorplan"])
+        self.assertFalse(body["has_background"])
+        resp, payload = self.req("GET", "/floorplan", raw=True)
+        self.assertEqual(payload, PNG)
+
+    def test_background_not_settable_via_settings(self):
+        self.login()
+        resp, _ = self.req("PUT", "/api/admin/settings", {"background": "../x"})
+        self.assertEqual(resp.status, 400)
 
 
 class RedirectTest(ServerCase):

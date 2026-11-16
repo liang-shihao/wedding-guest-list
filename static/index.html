@@ -88,9 +88,27 @@
   #plan img { display: block; width: 100%; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
   #plan .tip { text-align: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
+
+  /* Optional background photo: a fixed layer (works on iOS, unlike background-attachment: fixed). */
+  .bg { position: fixed; inset: 0; z-index: -1; background: center / cover no-repeat; }
+  .bg::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(251, 246, 241, .12) 0%, rgba(251, 246, 241, .4) 100%);
+  }
+  body.has-bg header {
+    background: rgba(255, 255, 255, .82);
+    border-radius: 16px; padding: 20px 16px 18px;
+    box-shadow: 0 6px 24px rgba(60, 30, 25, .12);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  body.has-bg .card { background: rgba(255, 255, 255, .94); }
+  body.has-bg #plan h2,
+  body.has-bg #plan .tip,
+  body.has-bg footer { color: var(--ink); text-shadow: 0 0 6px rgba(255, 255, 255, .9); }
 </style>
 </head>
 <body>
+<div class="bg" id="bg" hidden></div>
 <main>
   <header>
     <div class="ornament">囍</div>
@@ -227,6 +245,12 @@
     if (s.title) { document.getElementById("title").textContent = s.title; document.title = s.title + " · 座位查询"; }
     if (s.date_text) document.getElementById("date").textContent = s.date_text;
     if (s.welcome) { var w = document.getElementById("welcome"); w.textContent = s.welcome; w.hidden = false; }
+    if (s.has_background) {
+      var bg = document.getElementById("bg");
+      bg.style.backgroundImage = 'url("/background?v=' + encodeURIComponent(s.background_version) + '")';
+      bg.hidden = false;
+      document.body.classList.add("has-bg");
+    }
     if (s.has_floorplan) planSrc = "/floorplan?v=" + encodeURIComponent(s.floorplan_version);
   }, function () {});
 })();

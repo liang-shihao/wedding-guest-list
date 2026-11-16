@@ -9,7 +9,7 @@ from contextlib import contextmanager
 
 from .text import normalize_name
 
-SETTING_KEYS = ("title", "date_text", "welcome", "floorplan")
+SETTING_KEYS = ("title", "date_text", "welcome", "floorplan", "background")
 GUEST_FIELDS = ("name", "table", "public_note", "private_note")
 FUZZY_LIMIT = 5
 BACKUP_KEEP = 50

@@ -86,7 +86,7 @@
   .preview th, .preview td { border-bottom: 1px solid var(--line); text-align: left; padding: 5px 6px; vertical-align: top; }
   .preview th { color: var(--muted); font-weight: normal; }
   .errlist { color: var(--accent); font-size: 13px; padding-left: 18px; }
-  .plan img { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; display: block; margin: 8px 0; }
+  .plan img { max-width: 100%; max-height: 260px; border: 1px solid var(--line); border-radius: 8px; display: block; margin: 8px 0; }
 
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
@@ -173,15 +173,26 @@
         <p><button class="primary" type="submit">保存</button></p>
       </form>
       <div class="card plan">
-        <h2>宴会厅平面图</h2>
-        <p class="muted">支持 PNG / JPG / WEBP，不超过 5MB。上传后显示在查询结果下方。</p>
-        <div id="planNone" class="muted">还没有上传平面图。</div>
-        <img id="planImg" alt="当前平面图" hidden>
+        <h2>背景图片</h2>
+        <p class="muted">铺满查询页背景，例如婚纱照。支持 PNG / JPG / WEBP，不超过 1MB（每位宾客打开都要下载，越小越快，建议先压缩）。</p>
+        <div id="backgroundNone" class="muted">还没有上传背景图片。</div>
+        <img id="backgroundImg" alt="当前背景图片" hidden>
         <p>
-          <input id="planFile" type="file" accept="image/png,image/jpeg,image/webp">
+          <input id="backgroundFile" type="file" accept="image/png,image/jpeg,image/webp">
         </p>
-        <button class="danger" id="planDel" type="button" hidden>删除平面图</button>
+        <button class="danger" id="backgroundDel" type="button" hidden>删除背景图片</button>
       </div>
+      <div class="card plan">
+        <h2>宴会厅平面图</h2>
+        <p class="muted">支持 PNG / JPG / WEBP，不超过 5MB（建议压缩到几百 KB）。宾客查到座位后显示在结果下方。</p>
+        <div id="floorplanNone" class="muted">还没有上传平面图。</div>
+        <img id="floorplanImg" alt="当前平面图" hidden>
+        <p>
+          <input id="floorplanFile" type="file" accept="image/png,image/jpeg,image/webp">
+        </p>
+        <button class="danger" id="floorplanDel" type="button" hidden>删除平面图</button>
+      </div>
+    </div>
     </div>
   </section>
 </div>
@@ -421,8 +432,11 @@
   function loadSettings() {
     api("GET", "/api/settings").then(function (s) {
       $("s_title").value = s.title; $("s_date").value = s.date_text; $("s_welcome").value = s.welcome;
-      $("planImg").hidden = !s.has_floorplan; $("planDel").hidden = !s.has_floorplan; $("planNone").hidden = s.has_floorplan;
-      if (s.has_floorplan) $("planImg").src = "/floorplan?v=" + encodeURIComponent(s.floorplan_version);
+      Object.keys(IMAGES).forEach(function (slot) {
+        var has = s["has_" + slot];
+        $(slot + "Img").hidden = !has; $(slot + "Del").hidden = !has; $(slot + "None").hidden = has;
+        if (has) $(slot + "Img").src = "/" + slot + "?v=" + encodeURIComponent(s[slot + "_version"]);
+      });
     }, fail);
   }
   $("settingsForm").addEventListener("submit", function (ev) {
@@ -431,18 +445,24 @@
       title: $("s_title").value, date_text: $("s_date").value, welcome: $("s_welcome").value
     }).then(function () { toast("已保存"); }, fail);
   });
-  $("planFile").addEventListener("change", function () {
-    var f = this.files[0]; if (!f) return;
-    if (["image/png", "image/jpeg", "image/webp"].indexOf(f.type) < 0) { toast("只支持 PNG / JPG / WEBP 图片", true); this.value = ""; return; }
-    if (f.size > 5 * 1024 * 1024) { toast("图片不能超过 5MB", true); this.value = ""; return; }
-    var input = this;
-    api("POST", "/api/admin/floorplan", f, { "Content-Type": f.type }).then(function () {
-      toast("平面图已上传"); input.value = ""; loadSettings();
-    }, fail);
-  });
-  $("planDel").addEventListener("click", function () {
-    if (!confirm("确定删除平面图吗？")) return;
-    api("DELETE", "/api/admin/floorplan").then(function () { toast("已删除"); loadSettings(); }, fail);
+  var IMAGES = {
+    background: { name: "背景图片", max: 1 },
+    floorplan: { name: "平面图", max: 5 }
+  };
+  Object.keys(IMAGES).forEach(function (slot) {
+    var cfg = IMAGES[slot];
+    $(slot + "File").addEventListener("change", function () {
+      var f = this.files[0], input = this; if (!f) return;
+      if (["image/png", "image/jpeg", "image/webp"].indexOf(f.type) < 0) { toast("只支持 PNG / JPG / WEBP 图片", true); input.value = ""; return; }
+      if (f.size > cfg.max * 1024 * 1024) { toast(cfg.name + "不能超过 " + cfg.max + "MB，请先压缩", true); input.value = ""; return; }
+      api("POST", "/api/admin/" + slot, f, { "Content-Type": f.type }).then(function () {
+        toast(cfg.name + "已上传"); input.value = ""; loadSettings();
+      }, function (e) { input.value = ""; fail(e); });
+    });
+    $(slot + "Del").addEventListener("click", function () {
+      if (!confirm("确定删除" + cfg.name + "吗？")) return;
+      api("DELETE", "/api/admin/" + slot).then(function () { toast("已删除"); loadSettings(); }, fail);
+    });
   });
 
   // ---------- boot ----------
