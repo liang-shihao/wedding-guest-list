@@ -1,1 +1,455 @@
-<!doctype html><meta charset="utf-8"><title>后台</title>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex">
+<title>座位管理后台</title>
+<style>
+  :root {
+    --bg: #f6f3f1;
+    --card: #fff;
+    --ink: #2f2724;
+    --muted: #8a7a74;
+    --line: #e6dbd6;
+    --accent: #b8323a;
+    --accent-soft: #f8e6e4;
+    --warn: #9a6200;
+    --warn-soft: #fff4dc;
+    --ok: #2f7a4a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 15px; line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 16px 16px 80px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .bar .links { display: flex; gap: 14px; align-items: center; font-size: 14px; }
+  a { color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  input, textarea, button { font: inherit; }
+  input[type=text], input[type=password], input[type=search], textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { min-height: 160px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  button { cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
+  label.f { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; }
+  .tabs button { flex: 0 0 auto; }
+  .tabs button[aria-selected=true] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  #login { max-width: 360px; margin: 12vh auto 0; }
+  #login .row { display: flex; gap: 8px; margin-top: 12px; }
+  .err { color: var(--accent); font-size: 14px; margin-top: 8px; }
+
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .tools input { flex: 1 1 200px; }
+  .stats { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .stats .warn { color: var(--warn); font-weight: 600; }
+
+  .g { display: grid; grid-template-columns: 1.2fr .7fr 1.3fr 1.3fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .g.head { border-top: 0; font-size: 12px; color: var(--muted); padding-top: 0; }
+  .g input { padding: 7px 9px; }
+  .g .acts { display: flex; gap: 6px; }
+  .g .acts button { padding: 6px 10px; font-size: 13px; }
+  .g.dup { background: var(--warn-soft); margin: 0 -8px; padding: 8px; border-radius: 8px; }
+  .g .flag { grid-column: 1 / -1; font-size: 12px; color: var(--warn); margin-top: -4px; }
+  .g.dirty input { border-color: #d9a3a6; }
+  .g label.note { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .g label.note .tag { display: none; flex: 0 0 auto; font-size: 12px; color: var(--muted); width: 2.5em; }
+  .g label.note.priv .tag { color: var(--warn); }
+  .g.new { border-top: 2px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  @media (max-width: 640px) {
+    .g { grid-template-columns: 1fr 88px; }
+    .g.head { display: none; }
+    .g .pub, .g .priv { grid-column: 1 / -1; }
+    .g label.note .tag { display: inline; }
+    .g .acts { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+
+  .modes { display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
+  .preview { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  .preview th, .preview td { border-bottom: 1px solid var(--line); text-align: left; padding: 5px 6px; vertical-align: top; }
+  .preview th { color: var(--muted); font-weight: normal; }
+  .errlist { color: var(--accent); font-size: 13px; padding-left: 18px; }
+  .plan img { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; display: block; margin: 8px 0; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: rgba(40,30,28,.92); color: #fff; padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; max-width: calc(100% - 32px); z-index: 10;
+  }
+  #toast.bad { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="login" class="card" hidden>
+    <h1>座位管理后台</h1>
+    <form id="loginForm">
+      <label class="f" for="pw">管理密码</label>
+      <div class="row">
+        <input id="pw" type="password" autocomplete="current-password">
+        <button class="primary" type="submit">登录</button>
+      </div>
+      <div class="err" id="loginErr"></div>
+    </form>
+  </section>
+
+  <section id="app" hidden>
+    <div class="bar">
+      <h1>座位管理后台</h1>
+      <div class="links">
+        <a href="/" target="_blank">打开查询页</a>
+        <button class="linkbtn" id="logout" type="button">退出登录</button>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="guests" aria-selected="true">宾客名单</button>
+      <button type="button" data-tab="import" aria-selected="false">批量导入</button>
+      <button type="button" data-tab="settings" aria-selected="false">页面设置</button>
+    </div>
+
+    <!-- 宾客名单 -->
+    <div data-panel="guests" class="card">
+      <div class="tools">
+        <input id="filter" type="search" placeholder="搜索姓名 / 桌号 / 备注">
+        <a href="/api/admin/export" download="guests.csv"><button type="button">导出 CSV</button></a>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="g head"><div>姓名</div><div>桌号</div><div>公开说明（宾客可见）</div><div>内部备注（仅后台）</div><div></div></div>
+      <div id="list"></div>
+      <form class="g new" id="addForm" autocomplete="off">
+        <input name="name" type="text" placeholder="新宾客姓名">
+        <input name="table" type="text" placeholder="桌号">
+        <input class="pub" name="public_note" type="text" placeholder="公开说明（可空）">
+        <input class="priv" name="private_note" type="text" placeholder="内部备注（可空）">
+        <div class="acts"><button class="primary" type="submit">添加</button></div>
+      </form>
+    </div>
+
+    <!-- 批量导入 -->
+    <div data-panel="import" class="card" hidden>
+      <h2>从 Excel 粘贴导入</h2>
+      <p class="muted">在 Excel 里选中包含表头的几列（姓名、桌号、备注…）复制，粘贴到下面。
+        表头可用：姓名、桌号、公开说明（或「说明」）、内部备注（或「备注」）。单独的「备注」列会作为<strong>内部备注</strong>，宾客看不到。
+        没有表头时，列顺序按：姓名、桌号、内部备注、公开说明。</p>
+      <textarea id="importText" placeholder="姓名	桌号	备注&#10;张三	8	素食&#10;李四	主桌	"></textarea>
+      <div id="previewBox"></div>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="replace" checked> 覆盖：用这份名单替换全部（会自动备份旧名单）</label>
+        <label><input type="radio" name="mode" value="append"> 追加：加到现有名单后面</label>
+      </div>
+      <button class="primary" id="importBtn" type="button" disabled>导入</button>
+      <ul class="errlist" id="importErr"></ul>
+    </div>
+
+    <!-- 页面设置 -->
+    <div data-panel="settings" hidden>
+      <form class="card" id="settingsForm">
+        <h2>查询页文字</h2>
+        <label class="f" for="s_title">标题</label>
+        <input id="s_title" name="title" type="text" placeholder="例如：小明 & 小红 的婚礼">
+        <label class="f" for="s_date">日期</label>
+        <input id="s_date" name="date_text" type="text" placeholder="例如：2026.11.22">
+        <label class="f" for="s_welcome">欢迎语</label>
+        <textarea id="s_welcome" name="welcome" style="min-height:80px;font-family:inherit;font-size:15px" placeholder="例如：感谢您的到来"></textarea>
+        <p><button class="primary" type="submit">保存</button></p>
+      </form>
+      <div class="card plan">
+        <h2>宴会厅平面图</h2>
+        <p class="muted">支持 PNG / JPG / WEBP，不超过 5MB。上传后显示在查询结果下方。</p>
+        <div id="planNone" class="muted">还没有上传平面图。</div>
+        <img id="planImg" alt="当前平面图" hidden>
+        <p>
+          <input id="planFile" type="file" accept="image/png,image/jpeg,image/webp">
+        </p>
+        <button class="danger" id="planDel" type="button" hidden>删除平面图</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var guests = [];
+  var toastTimer;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function toast(msg, bad) {
+    var t = $("toast");
+    t.textContent = msg; t.className = bad ? "bad" : ""; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, bad ? 4000 : 2000);
+  }
+  function api(method, url, body, headers) {
+    var opts = { method: method, headers: headers || {}, credentials: "same-origin" };
+    if (body !== undefined) {
+      if (body instanceof Blob) opts.body = body;
+      else { opts.body = JSON.stringify(body); opts.headers["Content-Type"] = "application/json"; }
+    }
+    return fetch(url, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.status === 401 && url !== "/api/admin/login") { showLogin(); }
+        if (!r.ok) { var e = new Error(data.error || ("请求失败 " + r.status)); e.status = r.status; e.data = data; throw e; }
+        return data;
+      });
+    }, function () { throw new Error("网络错误，请重试"); });
+  }
+  function fail(e) { toast(e.message || "出错了", true); }
+
+  // ---------- login ----------
+  function showLogin() { $("app").hidden = true; $("login").hidden = false; $("pw").focus(); }
+  function showApp() { $("login").hidden = true; $("app").hidden = false; loadGuests(); loadSettings(); }
+
+  $("loginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    $("loginErr").textContent = "";
+    api("POST", "/api/admin/login", { password: $("pw").value }).then(function () {
+      $("pw").value = ""; showApp();
+    }, function (e) { $("loginErr").textContent = e.message; });
+  });
+  $("logout").addEventListener("click", function () {
+    api("POST", "/api/admin/logout", {}).then(showLogin, showLogin);
+  });
+
+  // ---------- tabs ----------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (x) {
+        x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      Array.prototype.forEach.call(document.querySelectorAll("[data-panel]"), function (p) {
+        p.hidden = p.getAttribute("data-panel") !== b.getAttribute("data-tab");
+      });
+    });
+  });
+
+  // ---------- guests ----------
+  var FIELDS = ["name", "table", "public_note", "private_note"];
+  var PH = { name: "姓名", table: "桌号", public_note: "公开说明", private_note: "内部备注" };
+
+  function loadGuests() {
+    return api("GET", "/api/admin/guests").then(function (d) { guests = d.guests; renderGuests(); }, fail);
+  }
+
+  function renderStats(shown) {
+    var s = $("stats");
+    while (s.firstChild) s.removeChild(s.firstChild);
+    var tables = {};
+    guests.forEach(function (g) { tables[g.table] = 1; });
+    s.appendChild(document.createTextNode("共 " + guests.length + " 人，" + Object.keys(tables).length + " 桌"
+      + (shown !== guests.length ? "，当前显示 " + shown + " 人" : "")));
+    var dup = guests.filter(function (g) { return g.dup_missing_note; }).length;
+    if (dup) {
+      s.appendChild(document.createTextNode("　"));
+      s.appendChild(el("span", "warn", dup + " 位同名宾客缺少公开说明，宾客无法区分，请补填"));
+    }
+  }
+
+  function guestRow(g) {
+    var row = el("form", "g" + (g.dup_missing_note ? " dup" : ""));
+    row.setAttribute("autocomplete", "off");
+    var inputs = {};
+    FIELDS.forEach(function (f) {
+      var i = el("input", f === "public_note" ? "pub" : f === "private_note" ? "priv" : null);
+      i.type = "text"; i.value = g[f] || ""; i.placeholder = PH[f]; i.setAttribute("aria-label", PH[f]);
+      i.addEventListener("input", function () {
+        var dirty = FIELDS.some(function (k) { return inputs[k].value !== (g[k] || ""); });
+        row.classList.toggle("dirty", dirty); save.disabled = !dirty;
+      });
+      inputs[f] = i;
+      if (f === "public_note" || f === "private_note") {
+        var wrap = el("label", "note " + i.className);
+        wrap.appendChild(el("span", "tag", f === "public_note" ? "公开" : "内部"));
+        i.className = "";
+        wrap.appendChild(i);
+        row.appendChild(wrap);
+      } else row.appendChild(i);
+    });
+    var acts = el("div", "acts");
+    var save = el("button", "primary", "保存"); save.type = "submit"; save.disabled = true;
+    var del = el("button", "danger", "删除"); del.type = "button";
+    acts.appendChild(save); acts.appendChild(del); row.appendChild(acts);
+    if (g.dup_missing_note) row.appendChild(el("div", "flag", "有同名宾客，请填写公开说明（如「新郎同事」）以便区分"));
+
+    row.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var body = {};
+      FIELDS.forEach(function (f) { body[f] = inputs[f].value; });
+      save.disabled = true;
+      api("PUT", "/api/admin/guests/" + g.id, body).then(function () {
+        toast("已保存"); loadGuests();
+      }, function (e) { save.disabled = false; fail(e); });
+    });
+    del.addEventListener("click", function () {
+      if (!confirm("确定删除「" + g.name + "」吗？")) return;
+      api("DELETE", "/api/admin/guests/" + g.id).then(function () { toast("已删除"); loadGuests(); }, fail);
+    });
+    return row;
+  }
+
+  function renderGuests() {
+    var q = $("filter").value.trim().toLowerCase();
+    var list = $("list");
+    while (list.firstChild) list.removeChild(list.firstChild);
+    var shown = guests.filter(function (g) {
+      if (!q) return true;
+      return FIELDS.some(function (f) { return String(g[f] || "").toLowerCase().indexOf(q) >= 0; });
+    });
+    // put rows needing attention first
+    shown.sort(function (a, b) { return (b.dup_missing_note ? 1 : 0) - (a.dup_missing_note ? 1 : 0); });
+    var frag = document.createDocumentFragment();
+    shown.forEach(function (g) { frag.appendChild(guestRow(g)); });
+    list.appendChild(frag);
+    if (!guests.length) list.appendChild(el("p", "muted", "名单还是空的。可以在「批量导入」里从 Excel 粘贴，或在下面逐个添加。"));
+    renderStats(shown.length);
+  }
+  $("filter").addEventListener("input", renderGuests);
+
+  $("addForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var f = ev.target, body = {};
+    FIELDS.forEach(function (k) { body[k] = f.elements[k].value; });
+    api("POST", "/api/admin/guests", body).then(function () {
+      FIELDS.forEach(function (k) { f.elements[k].value = ""; });
+      toast("已添加"); loadGuests(); f.elements.name.focus();
+    }, fail);
+  });
+
+  // ---------- import ----------
+  // Mirrors seat/importer.py for preview only; the server is authoritative.
+  var HEADER = { "姓名": "name", "桌号": "table", "公开说明": "public_note", "说明": "public_note", "内部备注": "private_note", "备注": "private_note" };
+  var ORDER = ["name", "table", "private_note", "public_note"];
+
+  function splitRows(text, delim) {
+    var rows = [], row = [], cell = "", i = 0, q = false, line = 1, start = 1;
+    for (; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else { if (c === "\n") line++; cell += c; }
+      } else if (c === '"' && cell === "") q = true;
+      else if (c === delim) { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); rows.push({ cells: row, line: start }); row = []; cell = ""; line++; start = line; }
+      else cell += c;
+    }
+    if (cell !== "" || row.length) { row.push(cell); rows.push({ cells: row, line: start }); }
+    return rows;
+  }
+  function parseImport(text) {
+    text = text.replace(/\r\n?/g, "\n");
+    var delim = text.indexOf("\t") >= 0 ? "\t" : ",";
+    var cols = null, rows = [], errors = [];
+    splitRows(text, delim).forEach(function (r) {
+      var cells = r.cells.map(function (c) { return c.trim(); });
+      if (!cells.some(Boolean)) return;
+      if (!cols) {
+        if (cells.indexOf("姓名") >= 0) { cols = cells.map(function (c) { return HEADER[c] || null; }); return; }
+        cols = ORDER.slice();
+      }
+      var g = { name: "", table: "", public_note: "", private_note: "" };
+      cols.forEach(function (f, i) { if (f && !g[f] && cells[i]) g[f] = cells[i]; });
+      if (!g.name) errors.push("第 " + r.line + " 行：姓名为空");
+      else if (!g.table) errors.push("第 " + r.line + " 行：桌号为空");
+      else rows.push(g);
+    });
+    return { rows: rows, errors: errors };
+  }
+  function renderPreview() {
+    var box = $("previewBox"); while (box.firstChild) box.removeChild(box.firstChild);
+    var errs = $("importErr"); while (errs.firstChild) errs.removeChild(errs.firstChild);
+    var text = $("importText").value;
+    if (!text.trim()) { $("importBtn").disabled = true; return; }
+    var p = parseImport(text);
+    p.errors.forEach(function (e) { errs.appendChild(el("li", null, e)); });
+    $("importBtn").disabled = !!p.errors.length || !p.rows.length;
+    $("importBtn").textContent = p.rows.length ? "导入 " + p.rows.length + " 人" : "导入";
+    if (!p.rows.length) return;
+    box.appendChild(el("p", "muted", "预览（共 " + p.rows.length + " 人" + (p.rows.length > 20 ? "，只显示前 20 行" : "") + "）："));
+    var t = el("table", "preview"), tr = el("tr");
+    ["姓名", "桌号", "公开说明", "内部备注"].forEach(function (h) { tr.appendChild(el("th", null, h)); });
+    t.appendChild(tr);
+    p.rows.slice(0, 20).forEach(function (g) {
+      var r = el("tr");
+      FIELDS.forEach(function (f) { r.appendChild(el("td", null, g[f])); });
+      t.appendChild(r);
+    });
+    box.appendChild(t);
+  }
+  $("importText").addEventListener("input", renderPreview);
+  $("importBtn").addEventListener("click", function () {
+    var mode = document.querySelector("input[name=mode]:checked").value;
+    var n = parseImport($("importText").value).rows.length;
+    if (mode === "replace" && !confirm("将用这 " + n + " 人替换全部 " + guests.length + " 人的名单（旧名单会自动备份）。确定吗？")) return;
+    $("importBtn").disabled = true;
+    api("POST", "/api/admin/import", { text: $("importText").value, mode: mode }).then(function (d) {
+      toast("已导入 " + d.count + " 人");
+      $("importText").value = ""; renderPreview(); loadGuests();
+      document.querySelector("[data-tab=guests]").click();
+    }, function (e) {
+      $("importBtn").disabled = false; fail(e);
+      var errs = $("importErr");
+      ((e.data && e.data.errors) || []).forEach(function (x) { errs.appendChild(el("li", null, x)); });
+    });
+  });
+
+  // ---------- settings ----------
+  function loadSettings() {
+    api("GET", "/api/settings").then(function (s) {
+      $("s_title").value = s.title; $("s_date").value = s.date_text; $("s_welcome").value = s.welcome;
+      $("planImg").hidden = !s.has_floorplan; $("planDel").hidden = !s.has_floorplan; $("planNone").hidden = s.has_floorplan;
+      if (s.has_floorplan) $("planImg").src = "/floorplan?t=" + Date.now();
+    }, fail);
+  }
+  $("settingsForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    api("PUT", "/api/admin/settings", {
+      title: $("s_title").value, date_text: $("s_date").value, welcome: $("s_welcome").value
+    }).then(function () { toast("已保存"); }, fail);
+  });
+  $("planFile").addEventListener("change", function () {
+    var f = this.files[0]; if (!f) return;
+    if (["image/png", "image/jpeg", "image/webp"].indexOf(f.type) < 0) { toast("只支持 PNG / JPG / WEBP 图片", true); this.value = ""; return; }
+    if (f.size > 5 * 1024 * 1024) { toast("图片不能超过 5MB", true); this.value = ""; return; }
+    var input = this;
+    api("POST", "/api/admin/floorplan", f, { "Content-Type": f.type }).then(function () {
+      toast("平面图已上传"); input.value = ""; loadSettings();
+    }, fail);
+  });
+  $("planDel").addEventListener("click", function () {
+    if (!confirm("确定删除平面图吗？")) return;
+    api("DELETE", "/api/admin/floorplan").then(function () { toast("已删除"); loadSettings(); }, fail);
+  });
+
+  // ---------- boot ----------
+  fetch("/api/admin/me", { credentials: "same-origin" }).then(function (r) {
+    if (r.ok) showApp(); else showLogin();
+  }, showLogin);
+})();
+</script>
+</body>
+</html>
