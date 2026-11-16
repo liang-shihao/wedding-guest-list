@@ -1,0 +1,16 @@
+[Unit]
+Description=Wedding seat lookup
+After=network.target
+
+[Service]
+Type=simple
+User=ecs-user
+WorkingDirectory=/opt/wedding-seat
+EnvironmentFile=/etc/wedding-seat.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/wedding-seat/app.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

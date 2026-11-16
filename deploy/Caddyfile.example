@@ -1,0 +1,9 @@
+# /etc/caddy/Caddyfile on the Hong Kong server.
+# Replace example.com with your domain; Caddy obtains HTTPS certificates automatically.
+# In /etc/wedding-seat.env also set:
+#   HOST=127.0.0.1
+#   TRUST_PROXY=1
+example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8001
+}
